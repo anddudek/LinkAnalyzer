@@ -3,11 +3,29 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace WpfBershka
 {
-    public class Product
+    public class Product : INotifyPropertyChanged
     {
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get
+            {
+                return _isSelected;
+            }
+            set
+            {
+                if (value != _isSelected)
+                {
+                    _isSelected = value;
+                    RaisePropertyChanged("IsSelected");
+                }
+            }
+        }
+
         private string _productLink;
         public string ProductLink
         {
@@ -17,7 +35,11 @@ namespace WpfBershka
             }
             set
             {
-                _productLink = value;
+                if (_productLink != value)
+                {
+                    _productLink = value;
+                    RaisePropertyChanged("ProductLink");
+                }
             }
         }
 
@@ -30,7 +52,11 @@ namespace WpfBershka
             }
             set
             {
-                _productPrizeString = value;
+                if (_productPrizeString != value)
+                {
+                    _productPrizeString = value;
+                    RaisePropertyChanged("ProductPrizeString");
+                }
             }
         }
 
@@ -39,5 +65,19 @@ namespace WpfBershka
             ProductLink = link;
             ProductPrizeString = prize;
         }
+
+        #region EventHandlers
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void RaisePropertyChanged(string property)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(property));
+            }
+        }
+
+        #endregion
     }
 }
