@@ -170,6 +170,24 @@ namespace WpfBershka
             }
             _productBuffer = new BlockingCollection<Product>();
             RaisePropertyChanged("ProductsFoundCollection");
+            // Here save to file
+        }
+
+        private int _threadsValue;
+        public int ThreadsValue
+        {
+            get
+            {
+                return _threadsValue;
+            }
+            set
+            {
+                if (_threadsValue != value)
+                {
+                    _threadsValue = value;
+                    RaisePropertyChanged("ThreadsValue");
+                }
+            }
         }
 
 
@@ -193,10 +211,20 @@ namespace WpfBershka
             }
         }
 
-        public ICommand AllowSaveToFileCommand
+        public ICommand AllowSaveToFileBATCommand
         {
             get
             {
+                _saveToFileFormat = SaveToFileFormat.Bat;
+                return new RelayCommand(AllowSaveToFile, CanAllowSaveToFile);
+            }
+        }
+
+        public ICommand AllowSaveToFileTXTCommand
+        {
+            get
+            {
+                _saveToFileFormat = SaveToFileFormat.Txt;
                 return new RelayCommand(AllowSaveToFile, CanAllowSaveToFile);
             }
         }
@@ -214,6 +242,22 @@ namespace WpfBershka
             get
             {
                 return new RelayCommand(DeleteSelected, CanDeleteSelected);
+            }
+        }
+
+        public ICommand SelectAllCommand
+        {
+            get
+            {
+                return new RelayCommand(SelectAll, CanSelectAll);
+            }
+        }
+
+        public ICommand OpenSelectedCommand
+        {
+            get
+            {
+                return new RelayCommand(OpenSelected, CanOpenSelected);
             }
         }
 
@@ -238,21 +282,27 @@ namespace WpfBershka
             }
             else //Start
             {
+                if (int.Parse(LinksBeggining) >= int.Parse(LinksEnding))
+                {
+                    MessageBox.Show("Początkowy numer linku musi być większy od końcowego", "Błąd");
+                    return;
+                }
                 _linkIterator = int.Parse(LinksBeggining);
-                _taskArray = new Task<int>[1]; // How many tasks
+                _cancellationTokenSource = new CancellationTokenSource();
+                _taskArray = new Task<int>[ThreadsValue]; // How many tasks
 
                 for (int i = 0; i < _taskArray.Length; i++)
                 {
+                    var x = i;
+                    var _it = _linkIterator++;
                     var task = Task.Run(() =>
                     {
-                        var link = new Product(_linkIterator.ToString(), 0.ToString());
+                        var link = GetLinkInfo(_it);
                         AddLinkToCollection(link);
-                        Thread.Sleep(1000);
-                        return 0;
+                        return x;
                     }, _cancellationTokenSource.Token);
                     _taskArray[i] = task;
                 }
-
 
                 Task.Factory.ContinueWhenAny(_taskArray, (t) =>
                 {
@@ -269,6 +319,8 @@ namespace WpfBershka
 
         private bool CanStartStopApp()
         {
+            if (_validationErrors.Count > 0)
+                return false;
             if (_isAppRunning)
                 return true;
             else
@@ -333,14 +385,14 @@ namespace WpfBershka
                 return;
             }
             Task<int> task;
+            var _it = _linkIterator++;
             task = Task.Run(() =>
             {
-                _linkIterator++;
-                var link = new Product(_linkIterator.ToString(), tResult.ToString());
+                var link = GetLinkInfo(_it);
                 AddLinkToCollection(link);
-                CurrentNumberLabel = "Aktualny numer: " + (_linkIterator).ToString();
-                ProgressValue = (((double)(_linkIterator) - double.Parse(LinksBeggining)) / (double.Parse(LinksEnding) - double.Parse(LinksBeggining))) * 100;
-                Thread.Sleep(1000);
+
+                CurrentNumberLabel = "Aktualny numer: " + (_it).ToString();
+                ProgressValue = (((double)(_it) - double.Parse(LinksBeggining)) / (double.Parse(LinksEnding) - double.Parse(LinksBeggining))) * 100;
                 return tResult;
             }, _cancellationTokenSource.Token);
             _taskArray[tResult] = task;
@@ -352,7 +404,13 @@ namespace WpfBershka
 
         private void DeleteSelected()
         {
-
+            for (int i = ProductsFoundCollection.Count - 1; i >= 0; i--)
+            {
+                if (ProductsFoundCollection[i].TransformerIsSelected)
+                {
+                    ProductsFoundCollection.RemoveAt(i);
+                }
+            }            
         }
 
         private bool CanDeleteSelected()
@@ -367,9 +425,9 @@ namespace WpfBershka
 
         private void SelectAll()
         {
-            foreach (var lvLink in ProductsFound)
+            foreach (var lvLink in ProductsFoundCollection)
             {
-                //lvLink.TransformerIsSelected = true;
+                lvLink.TransformerIsSelected = true;
             }
         }
 
@@ -378,12 +436,38 @@ namespace WpfBershka
             return true;
         }
 
+        private void OpenSelected()
+        {
+            // TODO
+            OpenWebsite("http://google.pl");
+            OpenWebsite("http://wp.pl");
+        }
+
+        private bool CanOpenSelected()
+        {
+            return true;
+        }
+
+        private static void OpenWebsite(string url)
+        {
+            System.Diagnostics.Process.Start(url);
+        }
+
+        private static Product GetLinkInfo(int linkID)
+        {
+            // TODO: Real process link
+            var link = new Product(linkID.ToString(), linkID.ToString());
+            Thread.Sleep(2000);
+            return link;
+        }
+
         #endregion
 
         #region Variables
 
         private bool _isAppRunning;
         private bool _isSaveToFileEnabled;
+        private SaveToFileFormat _saveToFileFormat;
         private BlockingCollection<Product> _productBuffer;
         private int _linkIterator;
         private Task<int>[] _taskArray;
@@ -405,6 +489,8 @@ namespace WpfBershka
             _productsFound = new List<Product>();
             _productsFoundCollection = new ObservableCollection<Product>();
             _cancellationTokenSource = new CancellationTokenSource();
+            _validationErrors = new ObservableCollection<ValidationError>();
+            _saveToFileFormat = SaveToFileFormat.Bat;
 
             // Timer to update ListView
             lvTimer = new System.Timers.Timer();
@@ -416,16 +502,10 @@ namespace WpfBershka
             CurrentNumberLabel = "Oczekiwanie na start...";
             ProgressValue = 0;
             LinksBeggining = "100000";
-            LinksEnding = "100005";
+            LinksEnding = "100015";
             SaveFilePath = "C:\\BershkaLinks.txt";
             StartStopButtonContent = "Start";
-
-            //var a = new Product("0001", "12");
-            //var a2 = new Product("0002", "13");
-            //AddLinkToCollection(a);
-            //AddLinkToCollection(a2);
-            //_productsFound.Add(a);
-            //_productsFound.Add(a2);
+            ThreadsValue = 5;
 
             InitializeComponent();
         }
@@ -435,13 +515,26 @@ namespace WpfBershka
         #region EventHandlers
 
         public event PropertyChangedEventHandler PropertyChanged;
-
         private void RaisePropertyChanged(string property)
         {
             if (PropertyChanged != null)
             {
                 PropertyChanged(this, new PropertyChangedEventArgs(property));
             }
+        }
+
+        public ObservableCollection<ValidationError> _validationErrors { get; private set; }
+        private void WindowError(object sender, ValidationErrorEventArgs e)
+        {
+            if (e.Action == ValidationErrorEventAction.Added)
+            {
+                _validationErrors.Add(e.Error);
+            }
+            else
+            {
+                _validationErrors.Remove(e.Error);
+            }
+            Console.WriteLine(_validationErrors.Count);
         }
 
         #endregion

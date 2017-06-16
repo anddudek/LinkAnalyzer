@@ -9,19 +9,19 @@ namespace WpfBershka
 {
     public class Product : INotifyPropertyChanged
     {
-        private bool _isSelected;
-        public bool IsSelected
+        private bool _transformerIsSelected;
+        public bool TransformerIsSelected
         {
             get
             {
-                return _isSelected;
+                return _transformerIsSelected;
             }
             set
             {
-                if (value != _isSelected)
+                if (value != _transformerIsSelected)
                 {
-                    _isSelected = value;
-                    RaisePropertyChanged("IsSelected");
+                    _transformerIsSelected = value;
+                    RaisePropertyChanged("TransformerIsSelected");
                 }
             }
         }
